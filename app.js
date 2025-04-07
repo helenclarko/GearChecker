@@ -105,6 +105,10 @@ client.on('messageCreate', async (msg) => {
                     msg.reply("Usage: !blacklist add <characterName> | !blacklist remove <characterName> | !blacklist view");
                 }
             }
+            // Add the help command
+            else if (command === CI.Commands.help) {
+                msg.reply(CI.Help); // Sends the help text defined in CI.Help
+            }
             // Check if the character is blacklisted before processing other commands
             else if (Object.values(CI.Commands).includes(command) && Object.values(RealmEnum).includes(realm) && name != null) {
                 if (isBlacklisted(name)) {
