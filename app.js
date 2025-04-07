@@ -37,14 +37,15 @@ function saveBlacklist() {
     console.log('Blacklist saved.');
 }
 
-// Function to add a character to the blacklist (case-insensitive)
-function addToBlacklist(characterName) {
+// Function to add a character to the blacklist with a reason (case-insensitive)
+function addToBlacklist(characterName, reason) {
     const normalizedCharacterName = characterName.toLowerCase(); // Convert to lowercase
 
-    if (!blacklist.includes(normalizedCharacterName)) {
-        blacklist.push(normalizedCharacterName); // Store normalized name
+    // Check if character is already in the blacklist
+    if (!blacklist.some(entry => entry.name === normalizedCharacterName)) {
+        blacklist.push({ name: normalizedCharacterName, reason: reason });
         saveBlacklist();  // Save the blacklist to the file after adding
-        console.log(`${characterName} added to the blacklist.`);
+        console.log(`${characterName} added to the blacklist for: ${reason}`);
     } else {
         console.log(`${characterName} is already on the blacklist.`);
     }
@@ -54,7 +55,7 @@ function addToBlacklist(characterName) {
 function removeFromBlacklist(characterName) {
     const normalizedCharacterName = characterName.toLowerCase(); // Convert to lowercase
 
-    const index = blacklist.indexOf(normalizedCharacterName);
+    const index = blacklist.findIndex(entry => entry.name === normalizedCharacterName);
     if (index !== -1) {
         blacklist.splice(index, 1);  // Remove the character
         saveBlacklist();  // Save the blacklist to the file after removing
@@ -67,12 +68,16 @@ function removeFromBlacklist(characterName) {
 // Function to check if a character is blacklisted (case-insensitive)
 function isBlacklisted(characterName) {
     const normalizedCharacterName = characterName.toLowerCase(); // Convert to lowercase
-    return blacklist.includes(normalizedCharacterName);
+    return blacklist.some(entry => entry.name === normalizedCharacterName);
 }
 
-// Function to show the blacklist
+// Function to show the blacklist with reasons
 function showBlacklist() {
-    return blacklist.length > 0 ? blacklist.join(', ') : 'No characters are blacklisted.';
+    if (blacklist.length > 0) {
+        return blacklist.map(entry => `${entry.name} - Reason: ${entry.reason}`).join('\n');
+    } else {
+        return 'No characters are blacklisted.';
+    }
 }
 
 client.on('ready', () => {
@@ -97,17 +102,18 @@ client.on('messageCreate', async (msg) => {
             if (command === "!blacklist") {
                 const action = msg.content.split(" ")[1];
                 const target = msg.content.split(" ")[2];
+                const reason = msg.content.split(" ").slice(3).join(" "); // Get the reason (everything after the character name)
 
-                if (action === "add" && target) {
-                    addToBlacklist(target);
-                    msg.reply(`${target} has been added to the blacklist.`);
+                if (action === "add" && target && reason) {
+                    addToBlacklist(target, reason);
+                    msg.reply(`${target} has been added to the blacklist for: ${reason}`);
                 } else if (action === "remove" && target) {
                     removeFromBlacklist(target);
                     msg.reply(`${target} has been removed from the blacklist.`);
                 } else if (action === "view") {
-                    msg.reply(`Current blacklist: ${showBlacklist()}`);
+                    msg.reply(`Current blacklist:\n${showBlacklist()}`);
                 } else {
-                    msg.reply("Usage: !blacklist add <characterName> | !blacklist remove <characterName> | !blacklist view");
+                    msg.reply("Usage: !blacklist add <characterName> <reason> | !blacklist remove <characterName> | !blacklist view");
                 }
             }
             
