@@ -37,10 +37,12 @@ function saveBlacklist() {
     console.log('Blacklist saved.');
 }
 
-// Function to add a character to the blacklist
+// Function to add a character to the blacklist (case-insensitive)
 function addToBlacklist(characterName) {
-    if (!blacklist.includes(characterName)) {
-        blacklist.push(characterName);
+    const normalizedCharacterName = characterName.toLowerCase(); // Convert to lowercase
+
+    if (!blacklist.includes(normalizedCharacterName)) {
+        blacklist.push(normalizedCharacterName); // Store normalized name
         saveBlacklist();  // Save the blacklist to the file after adding
         console.log(`${characterName} added to the blacklist.`);
     } else {
@@ -48,9 +50,11 @@ function addToBlacklist(characterName) {
     }
 }
 
-// Function to remove a character from the blacklist
+// Function to remove a character from the blacklist (case-insensitive)
 function removeFromBlacklist(characterName) {
-    const index = blacklist.indexOf(characterName);
+    const normalizedCharacterName = characterName.toLowerCase(); // Convert to lowercase
+
+    const index = blacklist.indexOf(normalizedCharacterName);
     if (index !== -1) {
         blacklist.splice(index, 1);  // Remove the character
         saveBlacklist();  // Save the blacklist to the file after removing
@@ -60,9 +64,10 @@ function removeFromBlacklist(characterName) {
     }
 }
 
-// Function to check if a character is blacklisted
+// Function to check if a character is blacklisted (case-insensitive)
 function isBlacklisted(characterName) {
-    return blacklist.includes(characterName);
+    const normalizedCharacterName = characterName.toLowerCase(); // Convert to lowercase
+    return blacklist.includes(normalizedCharacterName);
 }
 
 // Function to show the blacklist
@@ -105,6 +110,7 @@ client.on('messageCreate', async (msg) => {
                     msg.reply("Usage: !blacklist add <characterName> | !blacklist remove <characterName> | !blacklist view");
                 }
             }
+            
             // Add the help command
             else if (command === CI.Commands.help) {
                 msg.reply(CI.Help); // Sends the help text defined in CI.Help
