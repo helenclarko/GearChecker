@@ -38,7 +38,6 @@ const Help =
             !achievements Metalforce
             !achi Metalforce
             
-**Feel free to join the official Discord server of the bot [here](https://discord.gg/ZSDpeftAB7) and ask/suggest me anything!**
 `;
 
 const InvalidCommand =
