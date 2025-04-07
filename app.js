@@ -68,7 +68,12 @@ function removeFromBlacklist(characterName) {
 // Function to check if a character is blacklisted (case-insensitive)
 function isBlacklisted(characterName) {
     const normalizedCharacterName = characterName.toLowerCase(); // Convert to lowercase
-    return blacklist.some(entry => entry.name === normalizedCharacterName);
+    const entry = blacklist.find(entry => entry.name === normalizedCharacterName);
+    
+    if (entry) {
+        return { isBlacklisted: true, reason: entry.reason };  // Return reason if blacklisted
+    }
+    return { isBlacklisted: false, reason: null };
 }
 
 // Function to show the blacklist with reasons
