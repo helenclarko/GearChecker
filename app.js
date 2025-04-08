@@ -129,8 +129,8 @@ client.on('messageCreate', async (msg) => {
             // Check if the character is blacklisted before processing other commands
             else if (Object.values(CI.Commands).includes(command) && Object.values(RealmEnum).includes(realm) && name != null) {
                 if (isBlacklisted(name)) {
-                    msg.reply(`${name} is blacklisted and cannot be processed.`);
-                    return; // Skip further processing if the character is blacklisted
+                    msg.reply(`${name} is blacklisted for the following reason: ${blacklistStatus.reason} and cannot be processed.`);
+					return; // Skip further processing if the character is blacklisted
                 }
 
                 CharacterManager.GetCharacter(realm, name)
