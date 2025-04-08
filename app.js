@@ -66,7 +66,6 @@ function removeFromBlacklist(characterName) {
 }
 
 // Function to check if a character is blacklisted (case-insensitive)
-// Returns the status and reason
 function isBlacklisted(characterName) {
     const normalizedCharacterName = characterName.toLowerCase(); // Convert to lowercase
     const entry = blacklist.find(entry => entry.name === normalizedCharacterName);
@@ -129,12 +128,12 @@ client.on('messageCreate', async (msg) => {
             }
             // Check if the character is blacklisted before processing other commands
             else if (Object.values(CI.Commands).includes(command) && Object.values(RealmEnum).includes(realm) && name != null) {
-                const { isBlacklisted, reason } = isBlacklisted(name);  // Destructure the result to get both the status and reason
+				const { isBlacklisted: blacklistedStatus, reason } = isBlacklisted(name);  // Destructure with different variable names
 
-                if (isBlacklisted) {
-                    msg.reply(`${name} is blacklisted for the following reason: ${reason} and cannot be processed.`);
-                    return; // Skip further processing if the character is blacklisted
-                }
+				if (blacklistedStatus) {
+					msg.reply(`${name} is blacklisted for the following reason: ${reason} and cannot be processed.`);
+					return; // Skip further processing if the character is blacklisted
+				}
 
                 CharacterManager.GetCharacter(realm, name)
                     .then(async character => {
