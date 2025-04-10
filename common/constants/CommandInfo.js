@@ -5,6 +5,7 @@ const Commands = {
     ench: "!ench",
     gems: "!gems",
     armory: "!armory",
+    summary: "!summary",
     sum: "!sum",
     achievements: "!achievements",
 	achi: "!achi"
