@@ -156,6 +156,7 @@ client.on('messageCreate', async (msg) => {
                             case CI.Commands.armory:
                                 msg.reply(`${character.name}'s armory: ${character.Armory}`);
                                 break;
+			    case CI.Commands.summary:
                             case CI.Commands.sum:
                                 msg.reply(character.Summary);
                                 break;
