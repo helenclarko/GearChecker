@@ -17,77 +17,78 @@ const port = 2000;
 const blacklistFilePath = path.join('/app/database', 'blacklist.json');
 
 // Read the blacklist from the file when the bot starts
-let blacklist = [];
+let serverBlacklists = {};
 
 // Function to load the blacklist from the file
-function loadBlacklist() {
+function loadBlacklist(guildId) {
+    const filePath = path.join('/app/database', `blacklist_${guildId}.json`);
     try {
-        const data = fs.readFileSync(blacklistFilePath, 'utf8');
-        blacklist = JSON.parse(data);
-        console.log('Blacklist loaded.');
+        const data = fs.readFileSync(filePath, 'utf8');
+        serverBlacklists[guildId] = JSON.parse(data);
+        console.log(`Blacklist loaded for guild ${guildId}`);
     } catch (err) {
-        console.log('Error loading blacklist, starting with an empty list.');
-        blacklist = []; // Default to an empty list if the file doesn't exist or can't be read
+        console.log(`No existing blacklist for guild ${guildId}, starting fresh.`);
+        serverBlacklists[guildId] = [];
     }
 }
 
 // Function to save the blacklist to a file
-function saveBlacklist() {
-    fs.writeFileSync(blacklistFilePath, JSON.stringify(blacklist, null, 2));
-    console.log('Blacklist saved.');
+function saveBlacklist(guildId) {
+    const filePath = path.join('/app/database', `blacklist_${guildId}.json`);
+    fs.writeFileSync(filePath, JSON.stringify(serverBlacklists[guildId], null, 2));
+    console.log(`Blacklist saved for guild ${guildId}`);
 }
 
 // Function to add a character to the blacklist with a reason (case-insensitive)
-function addToBlacklist(characterName, reason) {
-    const normalizedCharacterName = characterName.toLowerCase(); // Convert to lowercase
+function addToBlacklist(guildId, characterName, reason) {
+    const normalizedName = characterName.toLowerCase();
+    if (!serverBlacklists[guildId]) loadBlacklist(guildId);
 
-    // Check if character is already in the blacklist
-    if (!blacklist.some(entry => entry.name === normalizedCharacterName)) {
-        blacklist.push({ name: normalizedCharacterName, reason: reason });
-        saveBlacklist();  // Save the blacklist to the file after adding
-        console.log(`${characterName} added to the blacklist for: ${reason}`);
-    } else {
-        console.log(`${characterName} is already on the blacklist.`);
+    const exists = serverBlacklists[guildId].some(entry => entry.name === normalizedName);
+    if (!exists) {
+        serverBlacklists[guildId].push({ name: normalizedName, reason });
+        saveBlacklist(guildId);
+        console.log(`${characterName} added to blacklist in guild ${guildId}`);
     }
 }
 
 // Function to remove a character from the blacklist (case-insensitive)
-function removeFromBlacklist(characterName) {
-    const normalizedCharacterName = characterName.toLowerCase(); // Convert to lowercase
+function removeFromBlacklist(guildId, characterName) {
+    const normalizedName = characterName.toLowerCase();
+    if (!serverBlacklists[guildId]) loadBlacklist(guildId);
 
-    const index = blacklist.findIndex(entry => entry.name === normalizedCharacterName);
+    const index = serverBlacklists[guildId].findIndex(entry => entry.name === normalizedName);
     if (index !== -1) {
-        blacklist.splice(index, 1);  // Remove the character
-        saveBlacklist();  // Save the blacklist to the file after removing
-        console.log(`${characterName} removed from the blacklist.`);
-    } else {
-        console.log(`${characterName} is not on the blacklist.`);
+        serverBlacklists[guildId].splice(index, 1);
+        saveBlacklist(guildId);
+        console.log(`${characterName} removed from blacklist in guild ${guildId}`);
     }
 }
 
 // Function to check if a character is blacklisted (case-insensitive)
-function isBlacklisted(characterName) {
-    const normalizedCharacterName = characterName.toLowerCase(); // Convert to lowercase
-    const entry = blacklist.find(entry => entry.name === normalizedCharacterName);
-    
-    if (entry) {
-        return { isBlacklisted: true, reason: entry.reason };  // Return reason if blacklisted
-    }
-    return { isBlacklisted: false, reason: null };
+function isBlacklisted(guildId, characterName) {
+    const normalizedName = characterName.toLowerCase();
+    if (!serverBlacklists[guildId]) loadBlacklist(guildId);
+
+    const entry = serverBlacklists[guildId].find(entry => entry.name === normalizedName);
+    return entry ? { isBlacklisted: true, reason: entry.reason } : { isBlacklisted: false, reason: null };
 }
 
 // Function to show the blacklist with reasons
-function showBlacklist() {
-    if (blacklist.length > 0) {
-        return blacklist.map(entry => `${entry.name} - Reason: ${entry.reason}`).join('\n');
-    } else {
-        return 'No characters are blacklisted.';
-    }
+function showBlacklist(guildId) {
+    if (!serverBlacklists[guildId]) loadBlacklist(guildId);
+    const list = serverBlacklists[guildId];
+    return list.length > 0
+        ? list.map(entry => `${entry.name} - Reason: ${entry.reason}`).join('\n')
+        : 'No characters are blacklisted.';
 }
 
 client.on('ready', () => {
     console.log(`[${new Date().toLocaleString()}]:> Logged in as: ${client.user.tag}`);
-    loadBlacklist();  // Load the blacklist when the bot starts
+    
+    client.guilds.cache.forEach(guild => {
+        loadBlacklist(guild.id);
+    });
 });
 
 client.on('messageCreate', async (msg) => {
@@ -96,6 +97,11 @@ client.on('messageCreate', async (msg) => {
     try {
         if (msg.content[0] === "!") {
             console.log(`[${new Date().toLocaleString()}]:> ${msg.content}`);
+
+	    if (!msg.guildId) {
+		msg.reply("This bot only works in servers.");
+		return;
+	    }
 
             let command = msg.content.split(" ")[0];
             let name = msg.content.split(" ")[1] !== undefined ? msg.content.split(" ")[1] : null;
@@ -110,13 +116,13 @@ client.on('messageCreate', async (msg) => {
                 const reason = msg.content.split(" ").slice(3).join(" "); // Get the reason (everything after the character name)
 
                 if (action === "add" && target && reason) {
-                    addToBlacklist(target, reason);
+                    addToBlacklist(msg.guildId, target, reason);
                     msg.reply(`${target} has been added to the blacklist for: ${reason}`);
                 } else if (action === "remove" && target) {
-                    removeFromBlacklist(target);
+                    removeFromBlacklist(msg.guildId, target);
                     msg.reply(`${target} has been removed from the blacklist.`);
                 } else if (action === "view") {
-                    msg.reply(`Current blacklist:\n${showBlacklist()}`);
+                    msg.reply(`Current blacklist:\n${showBlacklist(msg.guildId)}`);
                 } else {
                     msg.reply("Usage: !blacklist add <characterName> <reason> | !blacklist remove <characterName> | !blacklist view");
                 }
@@ -128,7 +134,7 @@ client.on('messageCreate', async (msg) => {
             }
             // Check if the character is blacklisted before processing other commands
             else if (Object.values(CI.Commands).includes(command) && Object.values(RealmEnum).includes(realm) && name != null) {
-				const { isBlacklisted: blacklistedStatus, reason } = isBlacklisted(name);  // Destructure with different variable names
+				const { isBlacklisted: blacklistedStatus, reason } = isBlacklisted(msg.guildId, name); // Destructure with different variable names
 
 				if (blacklistedStatus) {
 					msg.reply(`${name} is blacklisted for the following reason: ${reason} and cannot be processed.`);
