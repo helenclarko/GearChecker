@@ -13,9 +13,6 @@ const path = require('path'); // Module to work with file paths
 const app = express();
 const port = 2000;
 
-// Define the path to the blacklist.json file in the linked volume
-const blacklistFilePath = path.join('/app/database', 'blacklist.json');
-
 // Read the blacklist from the file when the bot starts
 let serverBlacklists = {};
 
@@ -185,6 +182,30 @@ client.on('messageCreate', async (msg) => {
     }
     catch (e) {
         console.log(`[${new Date().toLocaleString()}: ${guid}]:> ${e.message}`);
+    }
+});
+
+client.on('guildDelete', guild => {
+    console.log(`[${new Date().toLocaleString()}]:> Bot removed from guild: ${guild.id} (${guild.name})`);
+
+    const filePath = path.join('/app/database', `blacklist_${guild.id}.json`);
+
+    // Check if the file exists
+    if (fs.existsSync(filePath)) {
+        try {
+            fs.unlinkSync(filePath);
+            console.log(`[${new Date().toLocaleString()}]:> Deleted blacklist file for guild ${guild.id}`);
+        } catch (err) {
+            console.error(`[${new Date().toLocaleString()}]:> Error deleting blacklist file for guild ${guild.id}:`, err.message);
+        }
+    } else {
+        console.log(`[${new Date().toLocaleString()}]:> No blacklist file found for guild ${guild.id} to delete.`);
+    }
+
+    // Clean up the in-memory blacklist too
+    if (serverBlacklists[guild.id]) {
+        delete serverBlacklists[guild.id];
+        console.log(`[${new Date().toLocaleString()}]:> Removed guild ${guild.id} from memory.`);
     }
 });
 
