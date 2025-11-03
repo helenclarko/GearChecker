@@ -1,6 +1,9 @@
 services:
   gearchecker:
-    build: .
+    image: gearchecker:latest
+    build:
+      context: https://github.com/helenclarko/GearChecker.git
+      dockerfile: Dockerfile
     container_name: gearchecker
     restart: unless-stopped
     ports:
@@ -9,4 +12,4 @@ services:
       - ./logs:/app/logs
       - ./database:/app/database
     env_file:
-      - .env
+      - stack.env
