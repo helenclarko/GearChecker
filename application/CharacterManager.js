@@ -9,9 +9,15 @@ const { GetCamelToe, GetParams } = require('../common/helpers/GenericHelper')
 const axios = require('axios');
 const { Raids } = require('../common/constants/Achievements');
 
-const WARMANE_COOKIE = process.env.warmane_cookie || "";
-const WARMANE_USER_AGENT = process.env.warmane_user_agent ||
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:144.0) Gecko/20100101 Firefox/144.0";
+// Get cookie from global store (updated via API) or env var
+function getWarmaneCookie() {
+    return (global.warmaneCookieStore || process.env.warmane_cookie || "");
+}
+
+function getWarmaneUserAgent() {
+    return (global.warmaneUserAgentStore || process.env.warmane_user_agent ||
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:144.0) Gecko/20100101 Firefox/144.0");
+}
 
 async function GetCharacter(realm, name) {
     return new Promise(async (resolve, reject) => {
@@ -98,11 +104,11 @@ async function GetGems(character) {
     const options = {
         uri: `https://armory.warmane.com/character/${character.name}/${character.realm}/`,
         headers: {
-            "User-Agent": WARMANE_USER_AGENT,
+            "User-Agent": getWarmaneUserAgent(),
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9",
             "Accept-Encoding": "gzip, deflate",
-            "Cookie": WARMANE_COOKIE,
+            "Cookie": getWarmaneCookie(),
             "Upgrade-Insecure-Requests": "1",
             "Sec-Fetch-Site": "same-origin",
             "Sec-Fetch-Mode": "navigate",
@@ -112,6 +118,7 @@ async function GetGems(character) {
             "sec-ch-ua-platform": '"Windows"'
         },
         gzip: true,
+        simple: false,
         transform: function (body) {
             return cheerio.load(body);
         }
@@ -174,10 +181,9 @@ async function GetGems(character) {
                     resolve(character.Gems);
                 });
             })
-            .catch(err => {
-                console.log(err.message);
-
-                reject(new Error("Couldn't connect to the armory"));
+            .catch(_ => {
+                character.Gems = `${character.name} gem status unavailable right now.`;
+                resolve(character.Gems);
             });
     });
 }
@@ -189,11 +195,11 @@ async function GetEnchants(character) {
     const options = {
         uri: `https://armory.warmane.com/character/${character.name}/${character.realm}/`,
         headers: {
-            "User-Agent": WARMANE_USER_AGENT,
+            "User-Agent": getWarmaneUserAgent(),
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9",
             "Accept-Encoding": "gzip, deflate",
-            "Cookie": WARMANE_COOKIE,
+            "Cookie": getWarmaneCookie(),
             "Upgrade-Insecure-Requests": "1",
             "Sec-Fetch-Site": "same-origin",
             "Sec-Fetch-Mode": "navigate",
@@ -203,6 +209,7 @@ async function GetEnchants(character) {
             "sec-ch-ua-platform": '"Windows"'
         },
         gzip: true,
+        simple: false,
         transform: function (body) {
             return cheerio.load(body);
         }
@@ -249,6 +256,9 @@ async function GetEnchants(character) {
             if (missingEnchants.length === 0) character.Enchants = `${character.name} has all enchants! :white_check_mark:`;
             else character.Enchants = `${character.name} is missing enchants from: ${missingEnchants.join(", ")} :x:`;
 
+            resolve(character.Enchants);
+        }).catch(_ => {
+            character.Enchants = `${character.name} enchant status unavailable right now.`;
             resolve(character.Enchants);
         });
     });
@@ -298,8 +308,8 @@ async function GetAchievements(character) {
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
                     'Accept-Encoding': 'identity', // Important to prevent compression
-                    'User-Agent': WARMANE_USER_AGENT,
-                    'Cookie': WARMANE_COOKIE,
+                    'User-Agent': getWarmaneUserAgent(),
+                    'Cookie': getWarmaneCookie(),
                     'Referer': `https://armory.warmane.com/character/${character.name}/${character.realm}/`,
                     'Origin': 'https://armory.warmane.com',
                     'X-Requested-With': 'XMLHttpRequest',
