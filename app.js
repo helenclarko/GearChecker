@@ -243,21 +243,36 @@ app.get('/healthcheck', (req, res) => {
     res.sendStatus(200); // OK
 });
 
+// Helper function to get current cookie (for internal use) - moved before routes
+function getWarmaneCookie() {
+    return (global.warmaneCookieStore || process.env.warmane_cookie || "");
+}
+
+function getWarmaneUserAgent() {
+    return (global.warmaneUserAgentStore || process.env.warmane_user_agent ||
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:144.0) Gecko/20100101 Firefox/144.0");
+}
+
 // Endpoint to view current cookie status (for debugging)
 app.get('/cookie-status', (req, res) => {
-    const hasCookie = !!getWarmaneCookie();
-    const cookieLength = getWarmaneCookie().length;
-    const hasPHPSESSID = getWarmaneCookie().includes('PHPSESSID');
-    const hasCfClearance = getWarmaneCookie().includes('cf_clearance');
-    
-    res.json({
-        hasCookie,
-        cookieLength,
-        hasPHPSESSID,
-        hasCfClearance,
-        userAgent: getWarmaneUserAgent(),
-        cookiePreview: hasCookie ? getWarmaneCookie().substring(0, 50) + '...' : 'No cookie set'
-    });
+    try {
+        const cookie = getWarmaneCookie();
+        const hasCookie = !!cookie;
+        const cookieLength = cookie.length;
+        const hasPHPSESSID = cookie.includes('PHPSESSID');
+        const hasCfClearance = cookie.includes('cf_clearance');
+        
+        res.json({
+            hasCookie,
+            cookieLength,
+            hasPHPSESSID,
+            hasCfClearance,
+            userAgent: getWarmaneUserAgent(),
+            cookiePreview: hasCookie ? cookie.substring(0, 50) + '...' : 'No cookie set'
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // Endpoint to receive cookie via query string or POST
@@ -304,16 +319,6 @@ app.post('/set-cookie', (req, res) => {
         res.status(400).json({ success: false, error: 'No cookie provided' });
     }
 });
-
-// Helper function to get current cookie (for internal use)
-function getWarmaneCookie() {
-    return (global.warmaneCookieStore || process.env.warmane_cookie || "");
-}
-
-function getWarmaneUserAgent() {
-    return (global.warmaneUserAgentStore || process.env.warmane_user_agent ||
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:144.0) Gecko/20100101 Firefox/144.0");
-}
 
 // Cookie helper page - extracts cookies from browser and sends them
 app.get('/cookie-helper.html', (req, res) => {
@@ -502,8 +507,9 @@ app.get('/cookie-helper.html', (req, res) => {
     `);
 });
 
-// Start the express server
-app.listen(port, () => {
+// Start the express server - bind to 0.0.0.0 to be accessible from outside container
+app.listen(port, '0.0.0.0', () => {
     console.log(`[${new Date().toLocaleString()}]:> Server is running on port: ${port}`);
     console.log(`[${new Date().toLocaleString()}]:> Cookie helper available at: http://localhost:${port}/cookie-helper.html`);
+    console.log(`[${new Date().toLocaleString()}]:> Server accessible at: http://0.0.0.0:${port} (all interfaces)`);
 });
