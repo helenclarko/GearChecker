@@ -9,6 +9,10 @@ const { GetCamelToe, GetParams } = require('../common/helpers/GenericHelper')
 const axios = require('axios');
 const { Raids } = require('../common/constants/Achievements');
 
+const WARMANE_COOKIE = process.env.warmane_cookie || "";
+const WARMANE_USER_AGENT = process.env.warmane_user_agent ||
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:144.0) Gecko/20100101 Firefox/144.0";
+
 async function GetCharacter(realm, name) {
     return new Promise(async (resolve, reject) => {
         let character = await new Character(GetCamelToe(realm), GetCamelToe(name));
@@ -92,7 +96,22 @@ async function GetGearScore(character) {
 
 async function GetGems(character) {
     const options = {
-        uri: `http://armory.warmane.com/character/${character.name}/${character.realm}/`,
+        uri: `https://armory.warmane.com/character/${character.name}/${character.realm}/`,
+        headers: {
+            "User-Agent": WARMANE_USER_AGENT,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate",
+            "Cookie": WARMANE_COOKIE,
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Site": "same-origin",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Dest": "document",
+            "sec-ch-ua": '\"Chromium\";v=\"127\", \"Not)A;Brand\";v=\"24\", \"Google Chrome\";v=\"127\"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"Windows"'
+        },
+        gzip: true,
         transform: function (body) {
             return cheerio.load(body);
         }
@@ -168,7 +187,22 @@ async function GetEnchants(character) {
     let missingEnchants = [];
 
     const options = {
-        uri: `http://armory.warmane.com/character/${character.name}/${character.realm}/`,
+        uri: `https://armory.warmane.com/character/${character.name}/${character.realm}/`,
+        headers: {
+            "User-Agent": WARMANE_USER_AGENT,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate",
+            "Cookie": WARMANE_COOKIE,
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Site": "same-origin",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Dest": "document",
+            "sec-ch-ua": '\"Chromium\";v=\"127\", \"Not)A;Brand\";v=\"24\", \"Google Chrome\";v=\"127\"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"Windows"'
+        },
+        gzip: true,
         transform: function (body) {
             return cheerio.load(body);
         }
@@ -263,7 +297,18 @@ async function GetAchievements(character) {
                 url: `https://armory.warmane.com/character/${character.name}/${character.realm}/achievements`,
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                    'Accept-Encoding': 'identity' // Important to prevent compression
+                    'Accept-Encoding': 'identity', // Important to prevent compression
+                    'User-Agent': WARMANE_USER_AGENT,
+                    'Cookie': WARMANE_COOKIE,
+                    'Referer': `https://armory.warmane.com/character/${character.name}/${character.realm}/`,
+                    'Origin': 'https://armory.warmane.com',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Sec-Fetch-Site': 'same-origin',
+                    'Sec-Fetch-Mode': 'cors',
+                    'Sec-Fetch-Dest': 'empty',
+                    'sec-ch-ua': '"Chromium";v="127", "Not)A;Brand";v="24", "Google Chrome";v="127"',
+                    'sec-ch-ua-mobile': '?0',
+                    'sec-ch-ua-platform': '"Windows"'
                 },
                 data: `category=${category.categoryId}`
             });
