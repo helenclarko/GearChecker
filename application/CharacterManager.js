@@ -1,6 +1,6 @@
 const cheerio = require("cheerio");
-const request = require("request-promise");
 const { GetItems } = require('../infrastructure/ItemManager')
+const { fetchWithFallback } = require('../common/helpers/FlareSolverHelper')
 const { Character } = require('../domain/entities/Character')
 const { ItemTypeEnum, ItemTypeEnumToString } = require('../domain/enums/ItemTypeEnum')
 const { WarmaneItemTypeEnum } = require('../domain/enums/WarmaneItemTypeEnum')
@@ -28,6 +28,7 @@ async function GetCharacter(realm, name) {
             })
             .catch(err => {
                 console.log(err);
+                reject(err);
             });
     })
 }
@@ -91,21 +92,15 @@ async function GetGearScore(character) {
 }
 
 async function GetGems(character) {
-    const options = {
-        uri: `http://armory.warmane.com/character/${character.name}/${character.realm}/`,
-        transform: function (body) {
-            return cheerio.load(body);
-        }
-    };
-
     return new Promise((resolve, reject) => {
         let equippedItems = [];
         let actualItems = [];
         let i = 0;
         let missingGems = [];
 
-        request(options)
-            .then(($) => {
+        fetchWithFallback(`http://armory.warmane.com/character/${character.name}/${character.realm}/`)
+            .then((body) => {
+                const $ = cheerio.load(body);
                 $(".item-model a").each(function () {
                     let amount = 0;
                     let rel = $(this).attr("rel");
@@ -167,15 +162,10 @@ async function GetEnchants(character) {
     const bannedItems = [1, 5, 6, 9, 14, 15];
     let missingEnchants = [];
 
-    const options = {
-        uri: `http://armory.warmane.com/character/${character.name}/${character.realm}/`,
-        transform: function (body) {
-            return cheerio.load(body);
-        }
-    };
-
-    return new Promise((resolve) => {
-        request(options).then(($) => {
+    return new Promise((resolve, reject) => {
+        fetchWithFallback(`http://armory.warmane.com/character/${character.name}/${character.realm}/`)
+        .then((body) => {
+            const $ = cheerio.load(body);
             let items = [];
             let characterClass = $(".level-race-class").text().toLowerCase();
             let professions = [];
@@ -216,6 +206,9 @@ async function GetEnchants(character) {
             else character.Enchants = `${character.name} is missing enchants from: ${missingEnchants.join(", ")} :x:`;
 
             resolve(character.Enchants);
+        }).catch(err => {
+            console.log(err.message);
+            reject(new Error("Couldn't connect to the armory"));
         });
     });
 }
