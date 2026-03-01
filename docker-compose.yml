@@ -1,6 +1,7 @@
 services:
   gearchecker:
     image: gearchecker:latest
+    pull_policy: build
     build:
       context: https://github.com/helenclarko/GearChecker.git
       dockerfile: Dockerfile
