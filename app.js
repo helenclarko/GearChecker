@@ -13,20 +13,6 @@ const path = require('path'); // Module to work with file paths
 const app = express();
 const port = 2000;
 
-// Middleware for parsing JSON and URL-encoded bodies
-
-// Function to update cookie store and export it for use in other modules
-function updateCookieStore(cookie, userAgent) {
-    if (cookie) {
-        console.log(`[${new Date().toLocaleString()}]:> ✅ User-Agent updated via API`);
-    }
-}
-
-// Make cookie store accessible globally
-global.warmaneCookieStore = warmaneCookieStore;
-global.warmaneUserAgentStore = warmaneUserAgentStore;
-global.updateCookieStore = updateCookieStore;
-
 // Read the blacklist from the file when the bot starts
 let serverBlacklists = {};
 
