@@ -1,15 +1,13 @@
 const request = require('request-promise');
 const axios = require('axios');
 
-// Cached cookies per hostname, cleared after 10 minutes
 const cookieCache = new Map();
 const COOKIE_TTL_MS = 10 * 60 * 1000;
 
-// Reuse a single FlareSolverr browser session across requests
 let fsSession = null;
 
-async function getFSSession(flareSolverUrl) {
-    if (fsSession) return fsSession;
+async function createFSSession(flareSolverUrl) {
+    fsSession = null;
     try {
         const res = await axios.post(flareSolverUrl, { cmd: 'sessions.create' }, {
             headers: { 'Content-Type': 'application/json' }
@@ -22,6 +20,11 @@ async function getFSSession(flareSolverUrl) {
         console.warn('[FlareSolverr] Could not create session:', e.message);
     }
     return fsSession;
+}
+
+async function getFSSession(flareSolverUrl) {
+    if (fsSession) return fsSession;
+    return createFSSession(flareSolverUrl);
 }
 
 function getCachedCookies(url) {
@@ -42,6 +45,49 @@ function setCachedCookies(url, cookies) {
 
 function clearCachedCookies(url) {
     cookieCache.delete(new URL(url).hostname);
+}
+
+function sleep(ms) {
+    return new Promise(r => setTimeout(r, ms));
+}
+
+async function callFlareSolverr(flareSolverUrl, url, attempt = 1) {
+    const session = await getFSSession(flareSolverUrl);
+    const payload = { cmd: 'request.get', url, maxTimeout: 60000 };
+    if (session) payload.session = session;
+
+    let fsResponse;
+    try {
+        fsResponse = await axios.post(flareSolverUrl, payload, {
+            headers: { 'Content-Type': 'application/json' }
+        });
+    } catch (e) {
+        if (attempt < 3) {
+            console.warn(`[FlareSolverr] Request error on attempt ${attempt}, resetting session and retrying in 3s... (${e.message})`);
+            fsSession = null;
+            clearCachedCookies(url);
+            await sleep(3000);
+            return callFlareSolverr(flareSolverUrl, url, attempt + 1);
+        }
+        throw e;
+    }
+
+    if (fsResponse.data.status !== 'ok') {
+        if (attempt < 3) {
+            console.warn(`[FlareSolverr] Solve failed on attempt ${attempt}, resetting session and retrying in 3s... (${fsResponse.data.message})`);
+            fsSession = null;
+            clearCachedCookies(url);
+            await sleep(3000);
+            return callFlareSolverr(flareSolverUrl, url, attempt + 1);
+        }
+        throw new Error(`FlareSolver failed after ${attempt} attempts: ${fsResponse.data.message}`);
+    }
+
+    if (fsResponse.data.solution?.cookies?.length) {
+        setCachedCookies(url, fsResponse.data.solution.cookies);
+    }
+
+    return fsResponse.data.solution.response;
 }
 
 async function fetchWithFallback(url) {
@@ -66,24 +112,7 @@ async function fetchWithFallback(url) {
         if (!flareSolverUrl) throw err;
 
         console.log(`[${new Date().toLocaleString()}]:> Falling back to FlareSolver for ${url}`);
-
-        const session = await getFSSession(flareSolverUrl);
-        const payload = { cmd: 'request.get', url, maxTimeout: 60000 };
-        if (session) payload.session = session;
-
-        const fsResponse = await axios.post(flareSolverUrl, payload, {
-            headers: { 'Content-Type': 'application/json' }
-        });
-
-        if (fsResponse.data.status !== 'ok') {
-            throw new Error(`FlareSolver failed: ${fsResponse.data.message}`);
-        }
-
-        if (fsResponse.data.solution?.cookies?.length) {
-            setCachedCookies(url, fsResponse.data.solution.cookies);
-        }
-
-        return fsResponse.data.solution.response;
+        return callFlareSolverr(flareSolverUrl, url);
     }
 }
 
