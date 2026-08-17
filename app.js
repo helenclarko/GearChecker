@@ -174,7 +174,9 @@ client.on('messageCreate', async (msg) => {
                     .catch(err => {
                         console.log(err);
 
-                        msg.reply(err);
+                        msg.reply(err instanceof Error ? err.message : String(err)).catch(replyErr => {
+                            console.log(`[${new Date().toLocaleString()}]:> Failed to send error reply: ${replyErr.message}`);
+                        });
                     });
             }
             else msg.reply(CI.InvalidCommand);
