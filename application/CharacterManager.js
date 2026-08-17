@@ -17,8 +17,17 @@ async function GetCharacter(realm, name) {
             .then(async _ => {
                 if (character.valid) {
                     await GetGearScore(character);
-                    await GetEnchants(character);
-                    await GetGems(character);
+
+                    let armoryPage;
+                    try {
+                        armoryPage = await fetchWithFallback(`http://armory.warmane.com/character/${character.name}/${character.realm}/`);
+                    } catch (err) {
+                        console.log(err.message);
+                        return reject(new Error("Couldn't connect to the armory"));
+                    }
+
+                    await GetEnchants(character, armoryPage);
+                    await GetGems(character, armoryPage);
                     await GetTalents(character);
                     await GetSummary(character);
 
@@ -91,125 +100,111 @@ async function GetGearScore(character) {
     }
 }
 
-async function GetGems(character) {
-    return new Promise((resolve, reject) => {
+async function GetGems(character, body) {
+    return new Promise((resolve) => {
         let equippedItems = [];
         let actualItems = [];
         let i = 0;
         let missingGems = [];
 
-        fetchWithFallback(`http://armory.warmane.com/character/${character.name}/${character.realm}/`)
-            .then((body) => {
-                const $ = cheerio.load(body);
-                $(".item-model a").each(function () {
-                    let amount = 0;
-                    let rel = $(this).attr("rel");
+        const $ = cheerio.load(body);
+        $(".item-model a").each(function () {
+            let amount = 0;
+            let rel = $(this).attr("rel");
 
-                    if (rel) {
-                        var params = GetParams(rel);
+            if (rel) {
+                var params = GetParams(rel);
 
-                        if (params["gems"]) amount = params["gems"].split(":").filter(x => x != 0).length;
+                if (params["gems"]) amount = params["gems"].split(":").filter(x => x != 0).length;
 
-                        equippedItems.push(Number(params["item"]));
+                equippedItems.push(Number(params["item"]));
 
-                        actualItems.push({
-                            "itemID": Number(params["item"]),
-                            "gems": amount,
-                            "type": WarmaneItemTypeEnum[i]
-                        });
-                    }
-
-                    i++;
-                })
-
-                GetItems(equippedItems, (err, itemsDB) => {
-                    if (err) {
-                        console.log("Error:", err);
-                        return;
-                    }
-
-                    itemsDB.forEach(item => {
-                        let foundItem = actualItems.filter(x => x.itemID === item.itemID)[0];
-                        let hasBlacksmithing = character && character.professions && character.professions.length > 0 ?
-                            character.professions.map(prof => prof.name).includes("Blacksmithing") :
-                            false;
-                        let itsGlovesOrBracer = (foundItem.type === "Gloves" || foundItem.type === "Bracer");
-
-                        if (foundItem.type === "Belt" || (itsGlovesOrBracer && hasBlacksmithing)) {
-                            if ((item.gems + 1) !== foundItem.gems) {
-                                missingGems.push(foundItem.type);
-                            }
-                        } else if (item.gems > foundItem.gems) {
-                            missingGems.push(foundItem.type);
-                        }
-
-                    });
-                    if (missingGems.length === 0) character.Gems = `${character.name} has gemmed all his items! :white_check_mark:`;
-                    else character.Gems = `${character.name} needs to gem ${missingGems.join(", ")} :x:`;
-
-                    resolve(character.Gems);
+                actualItems.push({
+                    "itemID": Number(params["item"]),
+                    "gems": amount,
+                    "type": WarmaneItemTypeEnum[i]
                 });
-            })
-            .catch(err => {
-                console.log(err.message);
+            }
 
-                reject(new Error("Couldn't connect to the armory"));
+            i++;
+        })
+
+        GetItems(equippedItems, (err, itemsDB) => {
+            if (err) {
+                console.log("Error:", err);
+                return;
+            }
+
+            itemsDB.forEach(item => {
+                let foundItem = actualItems.filter(x => x.itemID === item.itemID)[0];
+                let hasBlacksmithing = character && character.professions && character.professions.length > 0 ?
+                    character.professions.map(prof => prof.name).includes("Blacksmithing") :
+                    false;
+                let itsGlovesOrBracer = (foundItem.type === "Gloves" || foundItem.type === "Bracer");
+
+                if (foundItem.type === "Belt" || (itsGlovesOrBracer && hasBlacksmithing)) {
+                    if ((item.gems + 1) !== foundItem.gems) {
+                        missingGems.push(foundItem.type);
+                    }
+                } else if (item.gems > foundItem.gems) {
+                    missingGems.push(foundItem.type);
+                }
+
             });
+            if (missingGems.length === 0) character.Gems = `${character.name} has gemmed all his items! :white_check_mark:`;
+            else character.Gems = `${character.name} needs to gem ${missingGems.join(", ")} :x:`;
+
+            resolve(character.Gems);
+        });
     });
 }
 
-async function GetEnchants(character) {
+async function GetEnchants(character, body) {
     const bannedItems = [1, 5, 6, 9, 14, 15];
     let missingEnchants = [];
 
-    return new Promise((resolve, reject) => {
-        fetchWithFallback(`http://armory.warmane.com/character/${character.name}/${character.realm}/`)
-        .then((body) => {
-            const $ = cheerio.load(body);
-            let items = [];
-            let characterClass = $(".level-race-class").text().toLowerCase();
-            let professions = [];
-            $(".profskills").find(".text").each(function () {
-                professions.push($(this).clone().children().remove().end().text().trim());
-            });
-            $(".item-model a").each(function () {
-                $(this).attr("href");
-                let rel = $(this).attr("rel");
-                items.push(rel);
-            });
+    return new Promise((resolve) => {
+        const $ = cheerio.load(body);
+        let items = [];
+        let characterClass = $(".level-race-class").text().toLowerCase();
+        let professions = [];
+        $(".profskills").find(".text").each(function () {
+            professions.push($(this).clone().children().remove().end().text().trim());
+        });
+        $(".item-model a").each(function () {
+            $(this).attr("href");
+            let rel = $(this).attr("rel");
+            items.push(rel);
+        });
 
-            for (let i = 0; i < items.length; i++) {
-                if (items[i]) {
-                    if (!bannedItems.includes(i)) {
-                        if (items[i].indexOf("ench") === -1) {
-                            if (WarmaneItemTypeEnum[i] === "Ranged") {
-                                if (characterClass.indexOf("hunter") >= 0) {
-                                    missingEnchants.push(WarmaneItemTypeEnum[i]);
-                                }
-                            } else if (WarmaneItemTypeEnum[i] === "Ring #1" || WarmaneItemTypeEnum[i] === "Ring #2") {
-                                if (professions.includes("Enchanting")) {
-                                    missingEnchants.push(WarmaneItemTypeEnum[i]);
-                                }
-                            } else if (WarmaneItemTypeEnum[i] === "Off-hand") {
-                                if (characterClass.indexOf("mage") < 0 && characterClass.indexOf("warlock") < 0 && characterClass.indexOf("druid") < 0 && characterClass.indexOf("priest") < 0) {
-                                    missingEnchants.push(WarmaneItemTypeEnum[i]);
-                                }
-                            } else {
+        for (let i = 0; i < items.length; i++) {
+            if (items[i]) {
+                if (!bannedItems.includes(i)) {
+                    if (items[i].indexOf("ench") === -1) {
+                        if (WarmaneItemTypeEnum[i] === "Ranged") {
+                            if (characterClass.indexOf("hunter") >= 0) {
                                 missingEnchants.push(WarmaneItemTypeEnum[i]);
                             }
+                        } else if (WarmaneItemTypeEnum[i] === "Ring #1" || WarmaneItemTypeEnum[i] === "Ring #2") {
+                            if (professions.includes("Enchanting")) {
+                                missingEnchants.push(WarmaneItemTypeEnum[i]);
+                            }
+                        } else if (WarmaneItemTypeEnum[i] === "Off-hand") {
+                            if (characterClass.indexOf("mage") < 0 && characterClass.indexOf("warlock") < 0 && characterClass.indexOf("druid") < 0 && characterClass.indexOf("priest") < 0) {
+                                missingEnchants.push(WarmaneItemTypeEnum[i]);
+                            }
+                        } else {
+                            missingEnchants.push(WarmaneItemTypeEnum[i]);
                         }
                     }
                 }
             }
+        }
 
-            if (missingEnchants.length === 0) character.Enchants = `${character.name} has all enchants! :white_check_mark:`;
-            else character.Enchants = `${character.name} is missing enchants from: ${missingEnchants.join(", ")} :x:`;
+        if (missingEnchants.length === 0) character.Enchants = `${character.name} has all enchants! :white_check_mark:`;
+        else character.Enchants = `${character.name} is missing enchants from: ${missingEnchants.join(", ")} :x:`;
 
-            resolve(character.Enchants);
-        }).catch(err => {
-            console.log(err.message);
-            reject(new Error("Couldn't connect to the armory"));
-        });
+        resolve(character.Enchants);
     });
 }
 
