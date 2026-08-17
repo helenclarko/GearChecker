@@ -51,6 +51,13 @@ function sleep(ms) {
     return new Promise(r => setTimeout(r, ms));
 }
 
+const MAX_ATTEMPTS = 2;
+const RETRY_BASE_DELAY_MS = 8000;
+
+function isIpBanMessage(message) {
+    return typeof message === 'string' && /ip is banned|blocked this request/i.test(message);
+}
+
 async function callFlareSolverr(flareSolverUrl, url, attempt = 1) {
     const session = await getFSSession(flareSolverUrl);
     const payload = { cmd: 'request.get', url, maxTimeout: 60000 };
@@ -62,22 +69,32 @@ async function callFlareSolverr(flareSolverUrl, url, attempt = 1) {
             headers: { 'Content-Type': 'application/json' }
         });
     } catch (e) {
-        if (attempt < 3) {
-            console.warn(`[FlareSolverr] Request error on attempt ${attempt}, resetting session and retrying in 3s... (${e.message})`);
+        if (isIpBanMessage(e.message)) {
+            console.warn(`[FlareSolverr] IP appears banned by Cloudflare, not retrying. (${e.message})`);
+            throw e;
+        }
+        if (attempt < MAX_ATTEMPTS) {
+            const delay = RETRY_BASE_DELAY_MS * attempt;
+            console.warn(`[FlareSolverr] Request error on attempt ${attempt}, resetting session and retrying in ${delay / 1000}s... (${e.message})`);
             fsSession = null;
             clearCachedCookies(url);
-            await sleep(3000);
+            await sleep(delay);
             return callFlareSolverr(flareSolverUrl, url, attempt + 1);
         }
         throw e;
     }
 
     if (fsResponse.data.status !== 'ok') {
-        if (attempt < 3) {
-            console.warn(`[FlareSolverr] Solve failed on attempt ${attempt}, resetting session and retrying in 3s... (${fsResponse.data.message})`);
+        if (isIpBanMessage(fsResponse.data.message)) {
+            console.warn(`[FlareSolverr] IP appears banned by Cloudflare, not retrying. (${fsResponse.data.message})`);
+            throw new Error(`FlareSolver failed: ${fsResponse.data.message}`);
+        }
+        if (attempt < MAX_ATTEMPTS) {
+            const delay = RETRY_BASE_DELAY_MS * attempt;
+            console.warn(`[FlareSolverr] Solve failed on attempt ${attempt}, resetting session and retrying in ${delay / 1000}s... (${fsResponse.data.message})`);
             fsSession = null;
             clearCachedCookies(url);
-            await sleep(3000);
+            await sleep(delay);
             return callFlareSolverr(flareSolverUrl, url, attempt + 1);
         }
         throw new Error(`FlareSolver failed after ${attempt} attempts: ${fsResponse.data.message}`);
